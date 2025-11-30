@@ -29,136 +29,131 @@
 
 package org.firstinspires.ftc.teamcode.Main.AprilTags;
 
+// Import necessary FTC classes for OpModes
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
+// Import FTC vision and camera classes
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
+// Import List for holding multiple detections
 import java.util.List;
 
 /*
- * This OpMode illustrates the basics of AprilTag recognition and pose estimation, using
- * the easy way.
- *
- * For an introduction to AprilTags, see the FTC-DOCS link below:
- * https://ftc-docs.firstinspires.org/en/latest/apriltag/vision_portal/apriltag_intro/apriltag-intro.html
- *
- * In this sample, any visible tag ID will be detected and displayed, but only tags that are included in the default
- * "TagLibrary" will have their position and orientation information displayed.  This default TagLibrary contains
- * the current Season's AprilTags and a small set of "test Tags" in the high number range.
- *
- * When an AprilTag in the TagLibrary is detected, the SDK provides location and orientation of the tag, relative to the camera.
- * This information is provided in the "ftcPose" member of the returned "detection", and is explained in the ftc-docs page linked below.
- * https://ftc-docs.firstinspires.org/apriltag-detection-values
- *
- * To experiment with using AprilTags to navigate, try out these two driving samples:
- * RobotAutoDriveToAprilTagOmni and RobotAutoDriveToAprilTagTank
- *
- * Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
- * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list.
- */@Disabled
+ * Example OpMode demonstrating the basics of AprilTag detection using the VisionPortal.
+ * Shows tag IDs, positions, rotations, and allows toggling camera streaming.
+ */
+@Disabled // Remove this to show the OpMode on Driver Station
 @TeleOp(name = "Concept: AprilTag Easy", group = "Concept")
-
 public class ConceptAprilTagEasy extends LinearOpMode {
 
-    private static final boolean USE_WEBCAM = true;  // true for webcam, false for phone camera
+    // Flag to select camera type: true = external webcam, false = phone camera
+    private static final boolean USE_WEBCAM = true;
 
-    /**
-     * The variable to store our instance of the AprilTag processor.
-     */
+    // Processor object for AprilTag detection
     private AprilTagProcessor aprilTag;
 
-    /**
-     * The variable to store our instance of the vision portal.
-     */
+    // Vision portal object to manage camera streaming and processing
     private VisionPortal visionPortal;
 
     @Override
     public void runOpMode() {
 
+        // Initialize the AprilTag processor and camera
         initAprilTag();
 
-        // Wait for the DS start button to be touched.
+        // Send instructions to Driver Station before start
         telemetry.addData("DS preview on/off", "3 dots, Camera Stream");
         telemetry.addData(">", "Touch START to start OpMode");
         telemetry.update();
+
+        // Wait until the START button is pressed
         waitForStart();
 
+        // Run while the OpMode is active
         if (opModeIsActive()) {
             while (opModeIsActive()) {
 
+                // Update telemetry with AprilTag detections
                 telemetryAprilTag();
 
-                // Push telemetry to the Driver Station.
+                // Push the telemetry data to Driver Station screen
                 telemetry.update();
 
-                // Save CPU resources; can resume streaming when needed.
+                // Allow user to stop or resume camera streaming using dpad
                 if (gamepad1.dpad_down) {
-                    visionPortal.stopStreaming();
+                    visionPortal.stopStreaming(); // Save CPU resources
                 } else if (gamepad1.dpad_up) {
-                    visionPortal.resumeStreaming();
+                    visionPortal.resumeStreaming(); // Resume camera stream
                 }
 
-                // Share the CPU.
+                // Short sleep to prevent CPU overload
                 sleep(20);
             }
         }
 
-        // Save more CPU resources when camera is no longer needed.
+        // Close the vision portal when done to free resources
         visionPortal.close();
 
-    }   // end method runOpMode()
+    }   // end runOpMode()
 
     /**
-     * Initialize the AprilTag processor.
+     * Initialize the AprilTag processor and camera portal.
      */
     private void initAprilTag() {
 
-        // Create the AprilTag processor the easy way.
+        // Create AprilTag processor using default settings
         aprilTag = AprilTagProcessor.easyCreateWithDefaults();
 
-        // Create the vision portal the easy way.
+        // Create the vision portal depending on camera choice
         if (USE_WEBCAM) {
+            // External webcam
             visionPortal = VisionPortal.easyCreateWithDefaults(
-                hardwareMap.get(WebcamName.class, "Webcam 1"), aprilTag);
+                    hardwareMap.get(WebcamName.class, "Webcam 1"), aprilTag);
         } else {
+            // Phone camera
             visionPortal = VisionPortal.easyCreateWithDefaults(
-                BuiltinCameraDirection.BACK, aprilTag);
+                    BuiltinCameraDirection.BACK, aprilTag);
         }
 
-    }   // end method initAprilTag()
+    }   // end initAprilTag()
 
     /**
-     * Add telemetry about AprilTag detections.
+     * Adds telemetry information about detected AprilTags.
      */
     private void telemetryAprilTag() {
 
+        // Get the list of currently detected tags
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+
+        // Show number of tags detected
         telemetry.addData("# AprilTags Detected", currentDetections.size());
 
-        // Step through the list of detections and display info for each one.
+        // Loop through each detection and display info
         for (AprilTagDetection detection : currentDetections) {
             if (detection.metadata != null) {
+                // Tag is recognized in TagLibrary, show full pose info
                 telemetry.addLine(String.format("\n==== (ID %d) %s", detection.id, detection.metadata.name));
                 telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
                 telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
                 telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
             } else {
+                // Tag is unknown, show only its ID and center coordinates
                 telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
                 telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
             }
-        }   // end for() loop
+        }   // end for loop
 
-        // Add "key" information to telemetry
+        // Add key for understanding telemetry output
         telemetry.addLine("\nkey:\nXYZ = X (Right), Y (Forward), Z (Up) dist.");
         telemetry.addLine("PRY = Pitch, Roll & Yaw (XYZ Rotation)");
         telemetry.addLine("RBE = Range, Bearing & Elevation");
 
-    }   // end method telemetryAprilTag()
+    }   // end telemetryAprilTag()
 
 }   // end class

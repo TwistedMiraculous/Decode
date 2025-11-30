@@ -1,11 +1,12 @@
 package org.firstinspires.ftc.teamcode.Main.motorTest;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-
+@Disabled
 @TeleOp(name = "Motor Test", group = "Concept")
 
 public class motor extends LinearOpMode {

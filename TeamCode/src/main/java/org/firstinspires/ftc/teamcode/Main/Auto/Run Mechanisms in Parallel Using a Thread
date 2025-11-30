@@ -1,0 +1,31 @@
+// Start intake and shooter in parallel
+Thread mechanismThread = new Thread(() -> {
+    try {
+        intake.setPower(1);
+        pusher1.setPower(1);
+        pusher2.setPower(1);
+        helper2.setPosition(0.1);
+        shooterLeft.setPower(0.7);
+        Thread.sleep(2000); // time to shoot
+        shooterLeft.setPower(0);
+        intake.setPower(0);
+        pusher1.setPower(0);
+        pusher2.setPower(0);
+        helper2.setPosition(0.0);
+    } catch (InterruptedException e) { }
+});
+mechanismThread.start();
+
+// Drive your path at the same time
+Actions.runBlocking(
+    drive.actionBuilder(beginPose)
+        .lineToX(30)
+        .turn(Math.toRadians(90))
+        .lineToY(30)
+        .turn(Math.toRadians(90))
+        .lineToX(0)
+        .turn(Math.toRadians(90))
+        .lineToY(0)
+        .turn(Math.toRadians(90))
+        .build()
+);
