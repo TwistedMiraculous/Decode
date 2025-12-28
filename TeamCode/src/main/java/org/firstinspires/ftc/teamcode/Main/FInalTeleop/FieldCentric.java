@@ -4,64 +4,99 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.teamcode.Main.Test.ConfigLED;
 
 @TeleOp
 public class FieldCentric extends LinearOpMode {
 
-    // Motors
-    private DcMotor shooterLeft;
+    // ---------------- SHOOTER CONSTANTS ----------------
+    private final double targetRPMHigh = 3900;
+    private final double targetRPMLow = 3400;
+    private final double targetRPM2Low = 3000;
+    private final double gearRatio = 1.0;
+    private final double ticksPerRev = 28 * gearRatio;   // GoBILDA motor at output shaft
+
+    private double targetTPSHigh = 0;
+    private double targetTPSLow2 = 0;
+    private double targetTPSLow = 0;
+
+    // ---------------- Hardware ----------------
+    private DcMotorEx shooterLeft;
     private DcMotor intake;
     private DcMotor frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor;
 
-    // Servos
     private CRServo pusher1, pusher2;
     private Servo helper1, helper2;
 
-    // Shooter toggle variables
+    // ---------------- Toggles ----------------
+    private boolean shooterOn = false;
+    private boolean yWasPressed = false;
+    private boolean bWasPressed = false;
+    private boolean xWasPressed = false;
 
-    private double shooterPower = 0.0;      // current motor power
-    private boolean yWasPressed = false;    // detect rising edge
-    private boolean bWasPressed = false;    // detect rising edge
-
-    // Intake toggle variables
     private boolean intakeOn = false;
     private boolean leftTriggerPreviouslyPressed = false;
 
+    private boolean slowMode = false;
+    private boolean backWasPressed = false;
+    private boolean rightBumperWasPressed = false;
+
+    // ---------------- PIDF Coefficients ----------------
+    private final double P = 60;
+    private final double I = 0;
+    private final double D = 6;
+    private final double FHigh = 5.0;   // Feedforward for high RPM target
+    private final double FLow  = 5.8;   // Feedforward for low RPM target (more to overcome inertia)
+    ConfigLED bench = new ConfigLED();
     @Override
     public void runOpMode() throws InterruptedException {
-        // Configure drive motors
+
+        // ---------------- DRIVE MOTORS ----------------
         frontLeftMotor = hardwareMap.dcMotor.get("frontLeft");
         backLeftMotor  = hardwareMap.dcMotor.get("backLeft");
         frontRightMotor= hardwareMap.dcMotor.get("frontRight");
         backRightMotor = hardwareMap.dcMotor.get("backRight");
 
+
+        // Initialize LEDs
+        bench.init(hardwareMap);
+
         frontLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         backLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        // Configure shooter and intake
-        shooterLeft = hardwareMap.get(DcMotor.class, "shooterLeft");
+        // ---------------- SHOOTER + INTAKE ----------------
+        shooterLeft = hardwareMap.get(DcMotorEx.class, "shooterLeft");
         intake      = hardwareMap.get(DcMotor.class, "intake");
 
-        shooterLeft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        shooterLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        shooterLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        shooterLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
-        // Configure servos
+        // Pre-calculate TPS targets
+        targetTPSHigh = targetRPMHigh * ticksPerRev / 60.0;
+        targetTPSLow  = targetRPMLow  * ticksPerRev / 60.0;
+        targetTPSLow2  = targetRPM2Low  * ticksPerRev / 60.0;
+
+        // ---------------- SERVOS ----------------
         pusher1 = hardwareMap.get(CRServo.class, "pusher1");
         pusher2 = hardwareMap.get(CRServo.class, "pusher2");
         pusher2.setDirection(CRServo.Direction.REVERSE);
+
         helper1 = hardwareMap.get(Servo.class, "helper1");
         helper2 = hardwareMap.get(Servo.class, "helper2");
 
-        // Configure IMU
-        IMU imu = hardwareMap.get(IMU.class, "pinpoint");
-        IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
+        // ---------------- IMU ----------------
+        IMU imu = hardwareMap.get(IMU.class, "imu");
+        imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                RevHubOrientationOnRobot.UsbFacingDirection.RIGHT));
-        imu.initialize(parameters);
+                RevHubOrientationOnRobot.UsbFacingDirection.RIGHT
+        )));
 
         telemetry.addLine("Robot Ready!");
         telemetry.update();
@@ -70,128 +105,154 @@ public class FieldCentric extends LinearOpMode {
         if (isStopRequested()) return;
 
         while (opModeIsActive()) {
-            // Field-centric drive
+
+            // ---------------- FIELD CENTRIC DRIVE ----------------
             double y = -gamepad1.left_stick_y;
             double x = gamepad1.left_stick_x;
             double rx = gamepad1.right_stick_x;
 
-            if (gamepad1.options) {
-                imu.resetYaw();
-                telemetry.addLine("Yaw reset!");
-                telemetry.update();
+            if (gamepad1.options) imu.resetYaw();
+
+            double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+
+            double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
+            double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
+            rotX *= 1.1;
+
+            double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1);
+
+            // Slow mode toggle
+            if (gamepad1.back && !backWasPressed) {
+                slowMode = !slowMode;
+            }
+
+            backWasPressed = gamepad1.back;
+
+            // LED indicator
+            if (slowMode) {
+                bench.setRedLed(false);
+                bench.setGreenLed(true);
+            } else {
+                bench.setRedLed(true);
+                bench.setGreenLed(false);
             }
 
 
-            double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-            double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
-            double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
-            rotX *= 1.1; // compensate strafing
+            double speedMultiplier = slowMode ? 0.5 : 1.0;
 
-            double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1);
-            frontLeftMotor.setPower((rotY + rotX + rx) / denominator);
-            backLeftMotor.setPower((rotY - rotX + rx) / denominator);
-            frontRightMotor.setPower((rotY - rotX - rx) / denominator);
-            backRightMotor.setPower((rotY + rotX - rx) / denominator);
+            // Drive power
+            frontLeftMotor.setPower(speedMultiplier * ((rotY + rotX + rx) / denominator));
+            backLeftMotor.setPower(speedMultiplier * ((rotY - rotX + rx) / denominator));
+            frontRightMotor.setPower(speedMultiplier * ((rotY - rotX - rx) / denominator));
+            backRightMotor.setPower(speedMultiplier * ((rotY + rotX - rx) / denominator));
 
-
-            shooterToggleControl();
-            shooterSpeedControl();  // Gamepad2 overrides only while pressed
+            // ---------------- CALL HANDLERS ----------------
             intakeControl();
             pusherControl();
             helperControl();
+            shooterToggleControl();
+            shooterGamepad2Control();
 
+            // ---------------- LIVE SHOOTER SPEED ----------------
+            double currentTPS = shooterLeft.getVelocity();     // ticks per second
+            double currentRPM = (currentTPS / ticksPerRev) * 60.0;
 
-            telemetry.addData("Motor Power", shooterLeft.getPower());
+            telemetry.addData("Shooter On?", shooterOn);
+            telemetry.addData("Current TPS", currentTPS);
+            telemetry.addData("Current RPM", currentRPM);
+            telemetry.addData("Target RPM High", targetRPMHigh);
+            telemetry.addData("Target RPM Low", targetRPMLow);
             telemetry.update();
         }
     }
 
-
-
-    private void shooterToggleControl() {
-        // Y button toggle
-        if (gamepad1.y && !yWasPressed) {
-            if (shooterPower == 0.7) {
-                shooterPower = 0; // turn off if already 1.0
-            } else {
-                shooterPower = 0.7; // turn on
-            }
-        }
-
-        // B button toggle
-        if (gamepad1.b && !bWasPressed) {
-            if (shooterPower == 0.5 ) {
-                shooterPower = 0.0; // turn off if already 0.9
-            } else {
-                shooterPower = 0.5; // turn on
-            }
-        }
-
-        // Update previous button states
-        yWasPressed = gamepad1.y;
-        bWasPressed = gamepad1.b;
-
-        // Set motor power
-        shooterLeft.setPower(shooterPower);
-    }
-
-
-    // Shooter Gamepad2 speed control (override while held)
-    private void shooterSpeedControl() {
-        double power = -1; // -1 means no override
-        if (gamepad2.dpad_left)  power = 0.6;
-        else if (gamepad2.dpad_up)    power = 0.65;
-        else if (gamepad2.dpad_right) power = 0.7;
-        else if (gamepad2.dpad_down)  power = 0.75;
-        else if (gamepad2.x)           power = 0.8;
-        else if (gamepad2.y)           power = 0.85;
-        else if (gamepad2.b)           power = 0.9;
-        else if (gamepad2.a)           power = 1.0;
-
-        if (power != -1) shooterLeft.setPower(power); // only set if pressed
-    }
-
-
+    // ---------------- INTAKE ----------------
     private void intakeControl() {
-        boolean leftTriggerPressed = gamepad1.left_trigger > 0.5;
+        boolean leftTriggerPressed = gamepad1.left_trigger > 0.5 || gamepad2.left_trigger > 0.5;
         if (leftTriggerPressed && !leftTriggerPreviouslyPressed) intakeOn = !intakeOn;
 
         if (intakeOn) intake.setPower(1);
-        else if (gamepad1.left_bumper) intake.setPower(-1);
+        else if (gamepad1.left_bumper || gamepad2.left_bumper) intake.setPower(-1);
         else intake.setPower(0);
 
         leftTriggerPreviouslyPressed = leftTriggerPressed;
     }
 
-
+    // ---------------- PUSHER ----------------
     private void pusherControl() {
-        if (gamepad1.dpad_left) {
+        if (gamepad1.dpad_left || gamepad2.dpad_left) {
             pusher1.setPower(-1);
             pusher2.setPower(-1);
-        }
-        else if (gamepad1.dpad_right) {
+        } else if (gamepad1.dpad_right || gamepad2.dpad_right) {
             pusher1.setPower(1);
             pusher2.setPower(1);
-        }
-        else {
+        } else {
             pusher1.setPower(0);
             pusher2.setPower(0);
         }
-
-        if (gamepad2.left_bumper) {
-            pusher1.setPower(-1);
-            pusher2.setPower(-1);
-        }
-        else if (gamepad2.right_bumper) helper1.setPosition(0.2);
-        else { helper1.setPosition(1.0); }
     }
 
-
+    // ---------------- HELPERS ----------------
     private void helperControl() {
-        if (gamepad1.a) helper1.setPosition(0.2);
-        else helper1.setPosition(1.0);
+        if (gamepad1.a || gamepad1.dpad_down || gamepad2.dpad_down) {
+            helper1.setPosition(0.2);
+        } else {
+            helper1.setPosition(1.0);
+        }
 
-        if (gamepad1.right_bumper) helper2.setPosition(0.1);
-        else helper2.setPosition(0.0);
+        boolean rb = gamepad1.right_bumper;
+        if (rb && !rightBumperWasPressed) {
+            helper2.setPosition(0.1);
+            sleep(400);
+            helper2.setPosition(0.0);
+        }
+        rightBumperWasPressed = rb;
     }
+
+    // ---------------- SHOOTER TOGGLE (Y / B) ----------------
+    private void shooterToggleControl() {
+
+        // HIGH RPM (Y)
+        if (gamepad1.y && !yWasPressed) {
+            shooterOn = !shooterOn;
+
+            if (shooterOn) {
+                shooterLeft.setVelocityPIDFCoefficients(P, I, D, FHigh);
+                shooterLeft.setVelocity(targetTPSHigh);
+            } else shooterLeft.setPower(0);
+        }
+
+        // MID RPM (B)
+        if (gamepad1.b && !bWasPressed) {
+            shooterOn = !shooterOn;
+
+            if (shooterOn) {
+                shooterLeft.setVelocityPIDFCoefficients(P, I, D, FLow);
+                shooterLeft.setVelocity(targetTPSLow);
+            } else shooterLeft.setPower(0);
+        }
+
+        // LOW RPM (X)
+        if (gamepad1.x && !xWasPressed) {
+            shooterOn = !shooterOn;
+
+            if (shooterOn) {
+                shooterLeft.setVelocityPIDFCoefficients(P, I, D, FLow);
+                shooterLeft.setVelocity(targetTPSLow2);
+            } else shooterLeft.setPower(0);
+        }
+
+        yWasPressed = gamepad1.y;
+        bWasPressed = gamepad1.b;
+        xWasPressed = gamepad1.x;
+    }
+
+    // ---------------- SHOOTER GAMEPAD 2 OVERRIDE ----------------
+    private void shooterGamepad2Control() {
+        if (gamepad2.x) shooterLeft.setVelocity(targetTPSLow2);
+        if (gamepad2.y) shooterLeft.setVelocity(targetTPSLow);
+        if (gamepad2.a) shooterLeft.setVelocity(targetTPSHigh);
+        if (gamepad2.b) shooterLeft.setVelocity(targetTPSHigh + 200); // slight boost
+    }
+
 }

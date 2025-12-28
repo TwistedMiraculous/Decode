@@ -16,7 +16,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
 import java.util.List;
-@Disabled
+
 @TeleOp(name = "AprilTag ID 21 Tracker", group = "Vision")
 public class Localization extends LinearOpMode {
 
@@ -29,7 +29,7 @@ public class Localization extends LinearOpMode {
     private static final double FIELD_SIZE = 72.0;     // half of 12x12ft field
     private static final int TARGET_ID = 21;           // Focus on GPP tag
 
-    private DcMotor motorForward;
+
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
     private FtcDashboard dashboard;
@@ -37,8 +37,6 @@ public class Localization extends LinearOpMode {
     @Override
     public void runOpMode() {
 
-        motorForward = hardwareMap.get(DcMotor.class, "motor");
-        motorForward.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         initAprilTag();
 
@@ -67,15 +65,14 @@ public class Localization extends LinearOpMode {
                     double y = detection.ftcPose.y;
                     double heading = detection.ftcPose.yaw;
 
-                    double power = calculatePower(distance);
-                    motorForward.setPower(power);
+
 
                     packet.put("Tracking Tag ID", TARGET_ID);
                     packet.put("Distance (inch)", distance);
                     packet.put("X (inch)", x);
                     packet.put("Y (inch)", y);
                     packet.put("Yaw (deg)", heading);
-                    packet.put("Motor Power", power);
+
 
                     drawFieldLayout(field);
 
@@ -85,7 +82,6 @@ public class Localization extends LinearOpMode {
 
                     telemetry.addData("Tracking Tag ID", TARGET_ID);
                     telemetry.addData("Distance", "%.1f in", distance);
-                    telemetry.addData("Power", "%.2f", power);
                     telemetry.addData("X", "%.1f", x);
                     telemetry.addData("Y", "%.1f", y);
                     telemetry.addData("Yaw", "%.1f", heading);
@@ -95,7 +91,7 @@ public class Localization extends LinearOpMode {
 
             // If Tag ID 21 not visible
             if (!foundTag21) {
-                motorForward.setPower(0);
+
                 telemetry.addLine("Tag ID 21 not visible");
                 packet.put("Tag ID 21 Visible", false);
                 drawFieldLayout(field);
