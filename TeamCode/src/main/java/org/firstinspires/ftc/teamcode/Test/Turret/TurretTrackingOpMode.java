@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Test.Vision;
+package org.firstinspires.ftc.teamcode.Test.Turret;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -26,7 +26,7 @@ public class TurretTrackingOpMode extends LinearOpMode {
             // 2. Tell the turret to move toward that X position
             turret.trackTarget(tagX);
 
-            // 3. Telemetry for debugging
+
             telemetry.addData("Tag X Position", tagX);
             if (tagX != -1) {
                 telemetry.addData("Targeting", "LOCKED");
@@ -36,7 +36,7 @@ public class TurretTrackingOpMode extends LinearOpMode {
             telemetry.update();
         }
 
-        // 4. Cleanup
+
         vision.close();
         turret.stop();
     }

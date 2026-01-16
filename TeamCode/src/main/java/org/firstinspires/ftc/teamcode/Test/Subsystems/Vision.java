@@ -20,7 +20,7 @@ public class Vision {
         AprilTagLibrary myTagLibrary = new AprilTagLibrary.Builder()
 
                 //Todo: Change Tag ID to the box ID
-                .addTag(19, "My100mmTag", 3.937, DistanceUnit.INCH)
+                .addTag(20, "My100mmTag", 4.5, DistanceUnit.INCH)
                 .build();
 
         // 2. Create the AprilTag logic with your custom library
@@ -28,7 +28,7 @@ public class Vision {
 // fx, fy, cx, cy
         aprilTag = new AprilTagProcessor.Builder()
                 .setTagLibrary(myTagLibrary)
-                .setLensIntrinsics(622.548, 622.548, 319.5, 239.5) // ADD THIS LINE
+                .setLensIntrinsics(622.548, 622.548, 319.5, 239.5)
                 .setDrawAxes(true)
                 .setDrawCubeProjection(true)
                 .build();;

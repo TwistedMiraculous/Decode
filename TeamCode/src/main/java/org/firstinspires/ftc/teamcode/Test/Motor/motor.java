@@ -5,7 +5,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 
-@Disabled
+
 @TeleOp(name = "Motor Test", group = "Concept")
 
 public class motor extends LinearOpMode {
@@ -16,7 +16,7 @@ public class motor extends LinearOpMode {
     public void runOpMode() {
 
 
-        motor = hardwareMap.get(DcMotor.class, "motor");
+        motor = hardwareMap.get(DcMotor.class, "motorTurret");
         waitForStart();
 
         if (opModeIsActive()) {
@@ -25,7 +25,7 @@ public class motor extends LinearOpMode {
 
                     motor.setPower(1);
 
-                } else if (gamepad1.b) {
+                } else if (gamepad1.y) {
 
                     motor.setPower(-1);
 
@@ -34,7 +34,7 @@ public class motor extends LinearOpMode {
 
                     motor.setPower(0.5);
                 }
-                else {
+                else if (gamepad1.b) {
 
                     motor.setPower(0);
 
